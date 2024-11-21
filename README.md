@@ -3,15 +3,15 @@ A console script that implements a generalized dice game.
 
 ## Introduction
 
-Welcome to the Dice Game! This is a general non-transitive dice game where players choose their own dice configurations and play with the computer. The dice can have any number of faces and the game is designed to highlight the non-transitive nature of dice (i.e., one die beats another, but loses to a third). The goal is to make the game both challenging and fair, where players cannot always select the highest value.
+Welcome to the General Non-Transitive Dice Game! In this game, players select dice with different faces and compete against the computer. The unique feature of this game is the non-transitive nature of the dice – one die may beat another, but lose to a third. This makes the game both fair and strategic.
 
 ## Features
 
-- 🎲 Dice throws for both player and computer.
-- 🔢 Add your number modulo 6 for fair gameplay.
-- 🧠 Play against a smart AI.
-- ❓ Interactive help and exit options.
-- 🕹️ Fun for all ages!
+- 🎲 Dice Throws: Both player and computer take turns rolling the dice.
+- 🔢 Modulo 6 for Fair Gameplay: Dice rolls are processed with modulo 6 for balanced gameplay.
+- 🧠 AI Opponent: Play against a smart AI that randomly selects dice and rolls them.
+- ❓ Interactive Help: View probabilities for winning against different dice combinations.
+- 🕹️ Fun for All Ages: A simple yet challenging dice game with a strategic twist.
 
 ## Installation
 
@@ -41,56 +41,63 @@ Follow these simple steps to get started:
     python game.py
     ```
 
-That's it! You're ready to play.
+Now you're ready to play!
 
 ## Game Setup
 
-To start the game, you specify the dice and their faces directly in the command line. Each set of numbers represents one die, and the numbers within the set are the faces of that die.
+The game allows you to specify the number of dice and the number of faces for each die through the command line.
+
 
 ### Example Command:
 
 ```bash
-java -jar game.jar 1,2,3,4,5,6 2,2,4,4,9,9 1,1,6,6,8,8
+python dice_game.py 4 7
+```
 
-1,2,3,4,5,6: The first die has faces with the values 1, 2, 3, 4, 5, 6.
-2,2,4,4,9,9: The second die has faces with the values 2, 2, 4, 4, 9, 9.
-1,1,6,6,8,8: The third die has faces with the values 1, 1, 6, 6, 8, 8.
-The game allows you to choose any number of dice (greater than 2) and define their faces as needed.
+The first number (e.g., 4) represents the number of dice.
+The second number (e.g., 7) represents the number of faces on each die.
+Make sure to specify valid configurations for a smooth game experience.
 
-Additional Parameters
-The number of dice and the faces of each die are defined in the command line. Make sure to pass valid dice configurations for the game to function properly.
+The game allows you to choose any number of dice (greater than 2) and the number of faces (greater than 6)
 
-Usage
-Once the game starts, you'll be prompted to make your move:
+##Gameplay
 
-Choose a dice number between 0 and 5.
-The game will calculate your throw and add it to the computer's number modulo 6.
-You’ll see the results and the winner will be displayed!
-Example of gameplay:
+Once the game starts, you'll be prompted to make a move by choosing a die and rolling it. You can also request help to view winning probabilities.
 
-You choose the [2, 2, 4, 4, 9, 9] die. It's time for my throw. I selected a random value in the range 0..5. Add your number modulo 6.
+###Example of Gameplay:
 
-0 - 0
-1 - 1
-2 - 2
-3 - 3
-4 - 4
-5 - 5
+1. Player's Turn: You select a dice configuration.
+2. Computer's Turn: The AI selects a die and rolls it.
+3. Result: The rolls are compared, and the winner is determined.
 
-Your selection: 4
+##Sample Output:
+```bash
+🎲 Welcome to the General Non-Transitive Dice Game! 🎲
+We will play with 4 dice(s) and 7 faces per die.
 
-The result is 4 + 3 = 1 (mod 6). My throw is 8.
+Let's determine who makes the first move! Or exit the game (x).
+Guess my selection (0 or 1):
+```
 
-And the game continues from there!
+After this, you'll choose a die to roll, and the computer will do the same. The winner is the player with the higher total roll.
 
-Contributing
-We welcome contributions! Feel free to fork this project, open an issue, or submit a pull request. Here's how you can contribute:
+###Commands
+- 1, 2, 3... Select a die to play.
+- W: View the probabilities of winning with different dice configurations.
+- X: Exit the game.
 
-Fork the repository.
-Create a new branch (git checkout -b feature-name).
-Make your changes.
-Commit your changes (git commit -am 'Add new feature').
-Push to the branch (git push origin feature-name).
-Open a pull request.
+
+
+##Contributing
+We welcome contributions! To contribute, follow these steps:
+
+1. Fork the repository.
+2. Create a new branch: git checkout -b feature-name.
+3. Make your changes and commit them: git commit -am 'Add new feature'.
+4. Push to the branch: git push origin feature-name.
+5. Open a pull request to merge your changes.
 
 All contributions are appreciated!
+
+###Acknowledgments
+- Thank you to the contributors of the tabulate and colorama libraries.

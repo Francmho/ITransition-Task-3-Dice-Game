@@ -12,14 +12,15 @@ init(autoreset=True)
 class MessageHandler:
     def __init__(self):
         self.messages = {
-            "welcome": "🎲 Welcome to the General Non-Transitive Dice Game! 🎲\nWe will play with {dice_count} dice(s) and {faces_count} faces per dice.",
-            "first_move": "Let's determine who makes the first move or exit the game.\nGuess my selection (0 or 1):",
-            "replay": "Would you like to play again? (Y/N):",
-            "win": "You win this round! 🎉",
-            "lose": "I win this round! Better luck next time!",
-            "draw": "It's a draw! 🤝",
+            "welcome": f"{Fore.MAGENTA}🎲 Welcome to the General Non-Transitive Dice Game! 🎲{Style.RESET_ALL}\nWe will play with {{dice_count}} dice(s) and {{faces_count}} faces per dice.",
+            "first_move": f"{Fore.MAGENTA}Let's determine who makes the first move!.{Style.RESET_ALL} Or exit the game (x).{Fore.MAGENTA}\nGuess my selection (0 or 1):{Style.RESET_ALL}",
+            "replay": f"{Fore.MAGENTA}Would you like to play again? (Y/N):{Style.RESET_ALL}",
+            "win": f"{Fore.GREEN}You win this round! 🎉{Style.RESET_ALL}",
+            "lose": f"{Fore.RED}I win this round! Better luck next time!{Style.RESET_ALL}",
+            "draw": f"{Fore.MAGENTA}It's a draw! 🤝{Style.RESET_ALL}",
             "reveal_hmac": "Here's the HMAC key for verification: {hmac_key}",
-            "final_result": "You won {user_wins} out of {total_rounds} rounds! 🏆",
+            "final_result_win": f"{Fore.GREEN}You won {{user_wins}} out of {{total_rounds}} rounds! 🏆{Style.RESET_ALL}",
+            "final_result_lose": f"{Fore.RED}🏆 I won 2 out of 3 rounds 👎!{Style.RESET_ALL}",
         }
 
     def get_message(self, message_type, **kwargs):
@@ -121,16 +122,30 @@ class HelpHandler:
         print(self.table.generate(dice_sets))
 
 class UserTurn:
-    def __init__(self, dice_set, message_handler):
+    def __init__(self, dice_set, message_handler, help_handler):
         self.dice_set = dice_set
         self.message_handler = message_handler
+        self.help_handler = help_handler
 
     def choose_dice(self):
         print("You are choosing dice...")
         for i, dice in self.dice_set.dice_sets.items():
             print(f"🎲 ({i+1}): {dice}")
-        choice = input(f"Which dice will you play? (1-{self.dice_set.dice_count}): ").strip()
-        return self.dice_set.get_dice(int(choice) - 1)
+        print("(W): Winning probabilities")
+        print("(X): Exit")    
+
+        while True:
+            choice = input(f"{Fore.MAGENTA}Which dice will you play? (1-{self.dice_set.dice_count}, W, X): {Style.RESET_ALL}").strip().lower()
+            
+            if choice == 'x':
+                print("Exiting the game...")
+                sys.exit()
+            elif choice == 'w':
+                self.help_handler.show_probabilities(self.dice_set.dice_sets)
+            elif choice.isdigit() and 1 <= int(choice) <= self.dice_set.dice_count:
+                return self.dice_set.get_dice(int(choice) - 1)
+            else:
+                print("Invalid input, please try again.")
 
     def roll_dice(self, dice):
         print(f"You are rolling dice: {dice}...")
@@ -174,7 +189,10 @@ class Result:
             print(self.message_handler.get_message("draw"))
 
     def display_final_result(self, total_rounds, hmac_key):
-        print(self.message_handler.get_message("final_result", user_wins=self.user_wins, total_rounds=total_rounds))
+        if self.user_wins >= 2:
+            print(self.message_handler.get_message("final_result_win", user_wins=self.user_wins, total_rounds=total_rounds))
+        else:
+            print(self.message_handler.get_message("final_result_lose", total_rounds=total_rounds))
         print(self.message_handler.get_message("reveal_hmac", hmac_key=hmac_key.hex()))
 
 
@@ -184,8 +202,10 @@ class DiceGame:
         self.random_generator = RandomGenerator()
         self.hmac_key = self.random_generator.generate_hmac_key()
         self.dice_set = DiceSet(dice_count, faces_count)
-        self.help_handler = None
-        self.user_turn = UserTurn(self.dice_set, self.message_handler)
+        self.probability_calculator = ProbabilityCalculator()
+        self.probability_table = ProbabilityTable(self.probability_calculator)
+        self.help_handler = HelpHandler(self.probability_table, self.message_handler)
+        self.user_turn = UserTurn(self.dice_set, self.message_handler, self.help_handler)
         self.computer_turn = ComputerTurn(self.dice_set, self.message_handler)
         self.result_handler = Result(self.message_handler)
         self.total_rounds = 3
@@ -200,7 +220,7 @@ class DiceGame:
         print(f"I have selected a secret value for this round. (HMAC={hmac_result})")
 
         while True:
-            guess = input("Your guess: ").strip().lower()
+            guess = input(f"{Fore.MAGENTA}Your guess: {Style.RESET_ALL}").strip().lower()
             if guess == 'x':
                 sys.exit("Thanks for playing! 👋")
             if guess.isdigit() and int(guess) in [0, 1]:
@@ -211,7 +231,7 @@ class DiceGame:
         print(f"{player} am/are choosing dice...")
         for i, dice in self.dice_set.dice_sets.items():
             print(f"🎲 ({i+1}): {dice}")
-        choice = input(f"Which dice will {player} play? (1-{dice_count}): ").strip()
+        choice = input(f"{Fore.MAGENTA}Which dice will {player} play? (1-{dice_count}): {Style.RESET_ALL}").strip()
         return self.dice_set.get_dice(int(choice) - 1)
 
     def roll_dice(self, player, dice):
@@ -223,11 +243,11 @@ class DiceGame:
             print(f"\n--- Round {round_num} ---")
             first_move = self.decide_first_move()
             if first_move == "user":
-                print("You go first!")
+                print(f"{Fore.GREEN}You go first!{Style.RESET_ALL}")
                 user_dice = self.user_turn.choose_dice()
                 computer_dice = self.computer_turn.choose_dice()
             else:
-                print("I go first!")
+                print(f"{Fore.RED}I go first!{Style.RESET_ALL}")
                 computer_dice = self.computer_turn.choose_dice()
                 user_dice = self.user_turn.choose_dice()
 

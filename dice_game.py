@@ -3,6 +3,7 @@ import hashlib
 import os
 import secrets
 import sys
+import random
 from tabulate import tabulate
 from colorama import Fore, Style, init
 
@@ -13,7 +14,7 @@ class MessageHandler:
     def __init__(self):
         self.messages = {
             "welcome": f"{Fore.MAGENTA}🎲 Welcome to the General Non-Transitive Dice Game! 🎲{Style.RESET_ALL}\nWe will play with {{dice_count}} dice(s) and {{faces_count}} faces per dice.",
-            "first_move": f"{Fore.MAGENTA}Let's determine who makes the first move!.{Style.RESET_ALL} Or exit the game (x).{Fore.MAGENTA}\nGuess my selection (0 or 1):{Style.RESET_ALL}",
+            "first_move": f"{Fore.MAGENTA}Let's determine who makes the first move!.{Style.RESET_ALL} Or exit the game (x).{Fore.MAGENTA}\nGuess my selection (from 0 to 3):{Style.RESET_ALL}",
             "replay": f"{Fore.MAGENTA}Would you like to play again? (Y/N):{Style.RESET_ALL}",
             "win": f"{Fore.GREEN}You win this round! 🎉{Style.RESET_ALL}",
             "lose": f"{Fore.RED}I win this round! Better luck next time!{Style.RESET_ALL}",
@@ -45,24 +46,26 @@ class GameValidations:
     def __init__(self):
         pass
 
-    def validate_dice_faces(self, num_dice, num_faces):
-        if num_dice < 2 or num_faces < 6:
-            raise ValueError("The game requires at least 2 dice and 6 faces.")
-        return True
+    def validate_dice_and_faces(self, dice_count, faces_count):
+        if dice_count < 2 or faces_count < 6:
+            print(f"Error: You must enter at least 2 dice and 6 faces. Current values: {dice_count} dice, {faces_count} faces.")
+            sys.exit(1)
 
     def validate_exit(self, user_input):
         if user_input.lower() == 'x':
             print("Exiting the game...")
-            exit()
+            return True
         return False
 
     def validate_numeric_input(self, input_value):
         try:
             value = int(input_value)
             if value <= 0:
-                raise ValueError
+                print("The input must be a positive integer.")
+                return None
         except ValueError:
-            raise ValueError("The input must be a positive integer.")
+            print("Invalid input. Please enter a number.")
+            return None
         return value
 
     def validate_initialization(self, num_dice, num_faces):
@@ -70,7 +73,8 @@ class GameValidations:
     
     def validate_dice_selection(self, selected_dice, num_dice):
         if selected_dice < 1 or selected_dice > num_dice:
-            raise ValueError(f"The selected dice must be between 1 and {num_dice}.")
+            print(f"The selected dice must be between 1 and {num_dice}.")
+            return False
         return True
 
 
@@ -86,14 +90,28 @@ class DiceSet:
     def get_dice(self, index):
         return self.dice_sets.get(index, [])
 
-
+1
 class ProbabilityCalculator:
     @staticmethod
-    def calculate_probability(user_dice, computer_dice):
-        user_sum, computer_sum = sum(user_dice), sum(computer_dice)
-        if user_sum == computer_sum:
-            return 33.33
-        return 55.56 if user_sum > computer_sum else 44.44
+    def calculate_probability(user_dice, computer_dice, trials=10000):
+        user_wins, computer_wins, draws = 0, 0, 0
+        
+        for _ in range(trials):
+            user_roll = random.choice(user_dice)
+            computer_roll = random.choice(computer_dice)
+            
+            if user_roll > computer_roll:
+                user_wins += 1
+            elif user_roll < computer_roll:
+                computer_wins += 1
+            else:
+                draws += 1
+        
+        total_games = user_wins + computer_wins + draws
+        user_probability = (user_wins / total_games) * 100
+        computer_probability = (computer_wins / total_games) * 100
+        
+        return user_probability, computer_probability
 
 
 class ProbabilityTable:
@@ -101,13 +119,13 @@ class ProbabilityTable:
         self.calculator = calculator
 
     def generate(self, dice_sets):
-        headers = [f"{Fore.CYAN}User Dice{Style.RESET_ALL}", "2,2,4,4,9,9", "1,1,6,6,8,8", "3,3,5,5,7,7"]
+        headers = [f"{Fore.CYAN}User Dice{Style.RESET_ALL}"] + [f"{Fore.CYAN}{i}{Style.RESET_ALL}" for i in range(1, len(dice_sets) + 1)]
         rows = []
         for user_dice in dice_sets.values():
             row = [f"{Fore.CYAN}{user_dice}{Style.RESET_ALL}"]
             for computer_dice in dice_sets.values():
-                prob = self.calculator.calculate_probability(user_dice, computer_dice)
-                row.append(f"- ({prob:.2f}%)" if user_dice == computer_dice else f"{prob:.2f}%")
+                user_prob, computer_prob = self.calculator.calculate_probability(user_dice, computer_dice)
+                row.append(f"{user_prob:.2f}% (Yours) / {computer_prob:.2f}% (Mine)" if user_dice != computer_dice else f"Draw {user_prob:.2f}%")
             rows.append(row)
         return tabulate(rows, headers, tablefmt="grid")
 
@@ -209,13 +227,14 @@ class DiceGame:
         self.computer_turn = ComputerTurn(self.dice_set, self.message_handler)
         self.result_handler = Result(self.message_handler)
         self.total_rounds = 3
+        self.total_choices = 4
 
     def show_welcome(self, dice_count, faces_count):
         print(self.message_handler.get_message("welcome", dice_count=dice_count, faces_count=faces_count))
 
     def decide_first_move(self):
         print(self.message_handler.get_message("first_move"))
-        computer_choice = self.random_generator.generate_random(2)
+        computer_choice = self.random_generator.generate_random(self.total_choices)
         hmac_result = self.random_generator.generate_hmac(self.hmac_key, computer_choice)
         print(f"I have selected a secret value for this round. (HMAC={hmac_result})")
 
@@ -223,7 +242,7 @@ class DiceGame:
             guess = input(f"{Fore.MAGENTA}Your guess: {Style.RESET_ALL}").strip().lower()
             if guess == 'x':
                 sys.exit("Thanks for playing! 👋")
-            if guess.isdigit() and int(guess) in [0, 1]:
+            if guess.isdigit() and 0 <= int(guess) <= 3:
                 return "user" if int(guess) == computer_choice else "computer"
             print("Invalid input, try again.")
 
@@ -277,7 +296,8 @@ if __name__ == "__main__":
 
     dice_count = int(sys.argv[1])
     faces_count = int(sys.argv[2])
-
+    validations = GameValidations()
+    validations.validate_dice_and_faces(dice_count, faces_count)
     game = DiceGame(dice_count, faces_count)
     probability_calculator = ProbabilityCalculator()
     probability_table = ProbabilityTable(probability_calculator)

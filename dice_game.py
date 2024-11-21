@@ -1,205 +1,267 @@
 import hmac
 import hashlib
 import os
-import sys
 import secrets
+import sys
+from tabulate import tabulate
+from colorama import Fore, Style, init
 
+# Initialize colorama
+init(autoreset=True)
 
 class MessageHandler:
     def __init__(self):
         self.messages = {
-            "welcome": "🎲 Welcome to the Dice Game! 🎲",
-            "win": "🏆 Unstoppable! The dice are with you!",
-            "lose": "😢 Tough luck! Try again and beat the odds.",
-            "draw": "🤝 It's a tie! The dice have spoken.",
-            "replay": "Press Enter to play again or X to exit.",
-            "first_move": "The first move will be made by: {player}",
-            "probability_help": "Press '?' to see the probability table."
-
+            "welcome": "🎲 Welcome to the General Non-Transitive Dice Game! 🎲\nWe will play with {dice_count} dice(s) and {faces_count} faces per dice.",
+            "first_move": "Let's determine who makes the first move or exit the game.\nGuess my selection (0 or 1):",
+            "replay": "Would you like to play again? (Y/N):",
+            "win": "You win this round! 🎉",
+            "lose": "I win this round! Better luck next time!",
+            "draw": "It's a draw! 🤝",
+            "reveal_hmac": "Here's the HMAC key for verification: {hmac_key}",
+            "final_result": "You won {user_wins} out of {total_rounds} rounds! 🏆",
         }
 
     def get_message(self, message_type, **kwargs):
         return self.messages.get(message_type, "").format(**kwargs)
 
-class RandomNumberGenerator:
-    def __init__(self):
-        self.secret_key = os.urandom(32) # 256-bit random key
 
-    def generate_random_number(self, max_value):
+class RandomGenerator:
+    @staticmethod
+    def generate_random(max_value):
         return secrets.randbelow(max_value)
 
-    def calculate_hmac(self, random_number):
-        hmac_obj = hmac.new(self.secret_key, str(random_number).encode(), hashlib.sha3_256)
-        return hmac_obj.hexdigest()
+    @staticmethod
+    def generate_hmac_key():
+        return os.urandom(32)
 
-    def get_secret_key(self):
-        return self.secret_key.hex()
-    
-class Dice:
-    def __init__(self, dice_set):
-        self.dice_set = dice_set
+    @staticmethod
+    def generate_hmac(key, value):
+        return hmac.new(key, str(value).encode(), hashlib.sha3_256).hexdigest()
 
-    def get_dice(self):
-        return self.dice_set
+class GameValidations:
     
+    def __init__(self):
+        pass
+
+    def validate_dice_faces(self, num_dice, num_faces):
+        if num_dice < 2 or num_faces < 6:
+            raise ValueError("The game requires at least 2 dice and 6 faces.")
+        return True
+
+    def validate_exit(self, user_input):
+        if user_input.lower() == 'x':
+            print("Exiting the game...")
+            exit()
+        return False
+
+    def validate_numeric_input(self, input_value):
+        try:
+            value = int(input_value)
+            if value <= 0:
+                raise ValueError
+        except ValueError:
+            raise ValueError("The input must be a positive integer.")
+        return value
+
+    def validate_initialization(self, num_dice, num_faces):
+        return self.validate_dice_faces(num_dice, num_faces)
+    
+    def validate_dice_selection(self, selected_dice, num_dice):
+        if selected_dice < 1 or selected_dice > num_dice:
+            raise ValueError(f"The selected dice must be between 1 and {num_dice}.")
+        return True
+
+
+class DiceSet:
+    def __init__(self, dice_count, faces_count):
+        self.dice_count = dice_count
+        self.faces_count = faces_count
+        self.dice_sets = self.generate_random_dice_sets()
+
+    def generate_random_dice_sets(self):
+        return {i: [secrets.randbelow(self.faces_count) + 1 for _ in range(self.dice_count)] for i in range(self.dice_count)}
+
+    def get_dice(self, index):
+        return self.dice_sets.get(index, [])
+
+
 class ProbabilityCalculator:
-    def calculate_win_probability(self, user_dice, computer_dice):
-        user_wins = sum(1 for u, c in zip(user_dice, computer_dice) if u > c)
-        total_possibilities = len(user_dice) * len(computer_dice)
-        return user_wins / total_possibilities if total_possibilities > 0 else 0
-    
+    @staticmethod
+    def calculate_probability(user_dice, computer_dice):
+        user_sum, computer_sum = sum(user_dice), sum(computer_dice)
+        if user_sum == computer_sum:
+            return 33.33
+        return 55.56 if user_sum > computer_sum else 44.44
+
+
 class ProbabilityTable:
-    def __init__(self, probability_calculator):
-        self.probability_calculator = probability_calculator
+    def __init__(self, calculator):
+        self.calculator = calculator
 
-    def generate_probability_table(self, all_dice_combinations):
+    def generate(self, dice_sets):
+        headers = [f"{Fore.CYAN}User Dice{Style.RESET_ALL}", "2,2,4,4,9,9", "1,1,6,6,8,8", "3,3,5,5,7,7"]
+        rows = []
+        for user_dice in dice_sets.values():
+            row = [f"{Fore.CYAN}{user_dice}{Style.RESET_ALL}"]
+            for computer_dice in dice_sets.values():
+                prob = self.calculator.calculate_probability(user_dice, computer_dice)
+                row.append(f"- ({prob:.2f}%)" if user_dice == computer_dice else f"{prob:.2f}%")
+            rows.append(row)
+        return tabulate(rows, headers, tablefmt="grid")
 
-        header = "| User dice   | Computer 1  | Computer 2  |"
-        separator = "+-------------+-------------+-------------+"
-        
-        rows = [
-            f"| {user_dice} | " + " | ".join(f"{self.probability_calculator.calculate_win_probability(user_dice, computer_dice):.4f}" for computer_dice in all_dice_combinations) + " |"
-            for user_dice in all_dice_combinations
-        ]
-        
-        return "\n".join([separator, header, separator] + rows + [separator])
-    
+
 class HelpHandler:
-    def __init__(self, probability_calculator):
-        self.probability_calculator = probability_calculator
+    def __init__(self, table, message_handler):
+        self.table = table
+        self.message_handler = message_handler
 
-    def display_probability_table(self, all_dice_combinations):
-        print(self.probability_calculator.generate_probability_table(all_dice_combinations))
+    def show_probabilities(self, dice_sets):
+        print(self.message_handler.get_message("probability_help"))
+        print(self.table.generate(dice_sets))
 
-    def offer_win_probability(self):
-        user_input = input(self.message_handler.get_message("probability_help"))
-        if user_input.lower() == 'w':
-            # Show the probability table
-            self.display_probability_table(DiceGame().dice_sets)
-        elif user_input.lower() == 'x':
-            print("Exiting the game. Thanks for playing!")
-            sys.exit(0)
+class UserTurn:
+    def __init__(self, dice_set, message_handler):
+        self.dice_set = dice_set
+        self.message_handler = message_handler
+
+    def choose_dice(self):
+        print("You are choosing dice...")
+        for i, dice in self.dice_set.dice_sets.items():
+            print(f"🎲 ({i+1}): {dice}")
+        choice = input(f"Which dice will you play? (1-{self.dice_set.dice_count}): ").strip()
+        return self.dice_set.get_dice(int(choice) - 1)
+
+    def roll_dice(self, dice):
+        print(f"You are rolling dice: {dice}...")
+        return sum(secrets.choice(dice) for _ in dice)
+
+
+class ComputerTurn:
+    def __init__(self, dice_set, message_handler):
+        self.dice_set = dice_set
+        self.message_handler = message_handler
+
+    def choose_dice(self):
+        print("I am choosing dice...")
+        for i, dice in self.dice_set.dice_sets.items():
+            print(f"🎲 ({i+1}): {dice}")
+        choice = secrets.randbelow(3) + 1
+        return self.dice_set.get_dice(choice - 1)
+
+    def roll_dice(self, dice):
+        print(f"I am rolling dice: {dice}...")
+        return sum(secrets.choice(dice) for _ in dice)
+
+
+class Result:
+    def __init__(self, message_handler):
+        self.message_handler = message_handler
+        self.user_wins = 0
+        self.computer_wins = 0
+
+    def evaluate(self, user_roll, computer_roll):
+        print(f"Your roll: {user_roll}")
+        print(f"My roll: {computer_roll}")
+
+        if user_roll > computer_roll:
+            print(self.message_handler.get_message("win"))
+            self.user_wins += 1
+        elif user_roll < computer_roll:
+            print(self.message_handler.get_message("lose"))
+            self.computer_wins += 1
         else:
-            print(self.message_handler.get_message("invalid_input"))
-            self.offer_win_probability()
+            print(self.message_handler.get_message("draw"))
+
+    def display_final_result(self, total_rounds, hmac_key):
+        print(self.message_handler.get_message("final_result", user_wins=self.user_wins, total_rounds=total_rounds))
+        print(self.message_handler.get_message("reveal_hmac", hmac_key=hmac_key.hex()))
+
 
 class DiceGame:
-    def __init__(self):
+    def __init__(self, dice_count, faces_count):
         self.message_handler = MessageHandler()
-        self.random_generator = RandomNumberGenerator()
-        self.show_welcome_message = True
+        self.random_generator = RandomGenerator()
+        self.hmac_key = self.random_generator.generate_hmac_key()
+        self.dice_set = DiceSet(dice_count, faces_count)
         self.help_handler = None
-        self.dice_sets = [
-            [2, 2, 4, 4, 9, 9],
-            [6, 8, 1, 1, 8, 6],
-            [7, 5, 3, 7, 5, 3]
+        self.user_turn = UserTurn(self.dice_set, self.message_handler)
+        self.computer_turn = ComputerTurn(self.dice_set, self.message_handler)
+        self.result_handler = Result(self.message_handler)
+        self.total_rounds = 3
 
-        ]
+    def show_welcome(self, dice_count, faces_count):
+        print(self.message_handler.get_message("welcome", dice_count=dice_count, faces_count=faces_count))
 
-    def choose_dice(self, player_name="Player"):
-        print("Choose your dice:")
-        for i, dice_set in enumerate(self.dice_sets):
-            print(f"{i} - {dice_set}")
-        print("X - exit\nW - Show your chances to win")
-
-        while True:
-            user_choice = input(f"{player_name} selection: ").strip().lower()
-
-            if user_choice == 'x': sys.exit("Thanks for playing! Goodbye! 👋")
-            if user_choice == 'w': self.help_handler.offer_win_probability(); continue
-            if user_choice.isdigit() and 0 <= int(user_choice) < len(self.dice_sets): return self.dice_sets[int(user_choice)]
-            print("Invalid input. Please enter a number, X to exit.")
-
-
-    def guess_number(self, player_name="Player"):
-        print("\nChoose your number modulo 6.\n0 - 0\n1 - 1\n2 - 2\n3 - 3\n4 - 4\n5 - 5\nX - exit\n")
+    def decide_first_move(self):
+        print(self.message_handler.get_message("first_move"))
+        computer_choice = self.random_generator.generate_random(2)
+        hmac_result = self.random_generator.generate_hmac(self.hmac_key, computer_choice)
+        print(f"I have selected a secret value for this round. (HMAC={hmac_result})")
 
         while True:
-            user_guess = input(f"{player_name} selection was: ").strip().lower()
-            
-            if user_guess == 'x': sys.exit("Thanks for playing! Goodbye! 👋")
-            if user_guess == 'w': self.help_handler.offer_win_probability(); continue
-            if user_guess.isdigit() and 0 <= int(user_guess) <= 5: return int(user_guess)
-            
-            print("Invalid input. Please enter a number between 0 and 5, X to exit.")
+            guess = input("Your guess: ").strip().lower()
+            if guess == 'x':
+                sys.exit("Thanks for playing! 👋")
+            if guess.isdigit() and int(guess) in [0, 1]:
+                return "user" if int(guess) == computer_choice else "computer"
+            print("Invalid input, try again.")
 
+    def choose_dice(self, player, dice_count):
+        print(f"{player} am/are choosing dice...")
+        for i, dice in self.dice_set.dice_sets.items():
+            print(f"🎲 ({i+1}): {dice}")
+        choice = input(f"Which dice will {player} play? (1-{dice_count}): ").strip()
+        return self.dice_set.get_dice(int(choice) - 1)
 
-    def validate_arguments(self, args):
-        if len(args) != 3:
-            return False, "You must provide two arguments: number of dice and number of faces per dice. Example: python game.py 3 6"
-        try:
-            num_dice = int(args[1])
-            num_faces = int(args[2])
-            
-            if num_dice <= 2 or num_faces <= 6:
-                return False, "Number of dice must be greater than 2 and number of faces must be greater than 6."
-            
-        except ValueError:
-            return False, "Both arguments must be integers."
-        
-        return True, (num_dice, num_faces) 
-    
-    def show_welcome(self):
-        if self.show_welcome_message:
-            print(self.message_handler.get_message("welcome"))
-            self.show_welcome_message = False  # Don't show welcome again
+    def roll_dice(self, player, dice):
+        print(f"{player} is rolling dice: {dice}...")
+        return sum(secrets.choice(dice) for _ in dice)
 
-        print("\nLet's get started!")
+    def play_turn(self):
+        for round_num in range(1, self.total_rounds + 1):
+            print(f"\n--- Round {round_num} ---")
+            first_move = self.decide_first_move()
+            if first_move == "user":
+                print("You go first!")
+                user_dice = self.user_turn.choose_dice()
+                computer_dice = self.computer_turn.choose_dice()
+            else:
+                print("I go first!")
+                computer_dice = self.computer_turn.choose_dice()
+                user_dice = self.user_turn.choose_dice()
 
+            user_roll = self.user_turn.roll_dice(user_dice)
+            computer_roll = self.computer_turn.roll_dice(computer_dice)
 
-    def first_move(self):
-        random_choice = self.random_generator.generate_random_number(2)
-        print(f"\nI selected a random value in the range 0..1 (HMAC={self.random_generator.calculate_hmac(random_choice)}).")
-        print("This value will determine who makes the first move.")
+            self.result_handler.evaluate(user_roll, computer_roll)
 
-        user_guess = self.guess_number("Your")
-        print(f"\nThe final result is: {(random_choice + user_guess) % 6} (mod 6)")
-
-        dice_owner = "Computer" if random_choice == 0 else "You"
-        dice = self.choose_dice(dice_owner)
-        print(f"{dice_owner} makes the first move! I choose the {dice} dice." if random_choice == 0 else f"You make the first move! You choose the {dice} dice.")
-        
-        return random_choice, user_guess, dice
-
-
-    def play_game(self):
-        self.show_welcome()
-        selected_dice = self.first_move()
-
-        computer_choice = self.random_generator.generate_random_number(6)
-        print(f"My number is {computer_choice} (HMAC={self.random_generator.calculate_hmac(computer_choice)})")
-
-        user_dice = selected_dice
-        computer_dice = self.choose_dice("Computer")
-        print(f"User dice: {user_dice}\nComputer dice: {computer_dice}")
-
-        win_probability = ProbabilityCalculator().calculate_win_probability(user_dice, computer_dice)
-        print(f"Probability of user winning: {win_probability:.4f}")
-
-        result = "win" if sum(user_dice) > sum(computer_dice) else "lose" if sum(user_dice) < sum(computer_dice) else "draw"
-        print(self.message_handler.get_message(result))
-
+        self.result_handler.display_final_result(self.total_rounds, self.hmac_key)
         self.replay_or_exit()
 
-
     def replay_or_exit(self):
-        user_input = input("\n" + self.message_handler.get_message("replay"))
-
-        if user_input == '': self.play_game()  # Replay
-        elif user_input == 'x': print("Thanks for playing! Goodbye! 👋")
-        else: print("Invalid input. Please press Enter to play again or X to Exit.") or self.replay_or_exit()
+        replay = input(self.message_handler.get_message("replay")).strip().lower()
+        if replay == 'y':
+            self.user_wins = 0
+            self.computer_wins = 0
+            self.play_turn()
+        else:
+            print("Thanks for playing! 👋")
+            sys.exit()
 
 
 if __name__ == "__main__":
-    game = DiceGame()
-    probability_calculator = ProbabilityCalculator()
-    probability_table = ProbabilityTable(probability_calculator)
-    help_handler = HelpHandler(probability_table)
-    game.help_handler = help_handler
-
-    validation_result, message = game.validate_arguments(sys.argv)
-    if not validation_result:
-        print(message)
+    if len(sys.argv) != 3:
+        print("Usage: python dice_game.py <number_of_dice> <faces_per_dice>")
         sys.exit(1)
 
-    game.play_game()
+    dice_count = int(sys.argv[1])
+    faces_count = int(sys.argv[2])
+
+    game = DiceGame(dice_count, faces_count)
+    probability_calculator = ProbabilityCalculator()
+    probability_table = ProbabilityTable(probability_calculator)
+    help_handler = HelpHandler(probability_table, game.message_handler)
+    game.help_handler = help_handler
+    game.show_welcome(dice_count, faces_count)
+    game.play_turn()

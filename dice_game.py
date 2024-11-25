@@ -46,6 +46,26 @@ class GameValidations:
     def __init__(self):
         pass
 
+    # def parse_input(self, input_str):
+    #     dice_groups = input_str.split()
+    #     dice_sets = []
+
+    #     for group in dice_groups:
+    #         faces = list(map(int, group.split(',')))
+    #         dice_sets.append(max(faces))
+
+    #     return dice_sets
+
+    # def validate_input(self, input_str):
+    #     try:
+    #         dice_sets = self.parse_input(input_str)
+    #         if len(dice_sets) < 2:
+    #             raise ValueError("Se requieren al menos dos dados.")
+    #         return dice_sets
+    #     except ValueError as e:
+    #         print(f"Error: {e}")
+    #         sys.exit(1)
+    #????Still in use
     def validate_dice_and_faces(self, dice_count, faces_count):
         if dice_count < 2 or faces_count < 6:
             print(f"Error: You must enter at least 2 dice and 6 faces. Current values: {dice_count} dice, {faces_count} faces.")

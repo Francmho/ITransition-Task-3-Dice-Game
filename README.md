@@ -51,11 +51,11 @@ The game allows you to specify the number of dice and the number of faces for ea
 ### Example Command:
 
 ```bash
-python dice_game.py 4 7
+python python game_dice.py 3,4,7,7,4,3 7,4,5,6,3,5 8,5,8,2,3,8
 ```
 
-The first number (e.g., 4) represents the number of dice.
-The second number (e.g., 7) represents the number of faces on each die.
+The first group of numbers (e.g. 3,4,7,7,4,3) represents a dice and its faces.
+The second group (e.g. 3,4,7,7,4,3 7,4,5,6,3,5) must be separated by a space.
 Make sure to specify valid configurations for a smooth game experience.
 
 The game allows you to choose any number of dice (greater than 2) and the number of faces (greater than 6)
@@ -82,7 +82,7 @@ Guess my selection (0 or 1):
 After this, you'll choose a die to roll, and the computer will do the same. The winner is the player with the higher total roll.
 
 ###Commands
-- 1, 2, 3... Select a die to play.
+- 0, 1, 2, 3... Select a die to play.
 - W: View the probabilities of winning with different dice configurations.
 - X: Exit the game.
 

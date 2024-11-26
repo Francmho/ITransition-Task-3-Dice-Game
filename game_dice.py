@@ -15,7 +15,7 @@ class MessageHandler:
     def __init__(self):
         self.messages = {
             "welcome": f"{Fore.MAGENTA}🎲 Welcome to the General Non-Transitive Dice Game! 🎲{Style.RESET_ALL}\nWe will play with {{dice_count}} dice(s) and {{faces_count}} faces per dice.",
-            "first_move": f"{Fore.MAGENTA}Let's determine who makes the first move!.{Style.RESET_ALL} Or exit the game (x).{Fore.YELLOW}\nGuess my selection (from 0 to 3):{Style.RESET_ALL}",
+            "first_move": f"{Fore.MAGENTA}Let's determine who makes the first move!.{Style.RESET_ALL} Exit the game anytime (x).{Fore.YELLOW}\nGuess my selection (from 0 to 3):{Style.RESET_ALL}",
             "replay": f"{Fore.MAGENTA}Would you like to play again? (Y/N):{Style.RESET_ALL}",
             "win": f"{Fore.GREEN}You win this round! 🎉{Style.RESET_ALL}",
             "lose": f"{Fore.RED}I win this round! Better luck next time!{Style.RESET_ALL}",
@@ -91,16 +91,7 @@ class GameValidations:
             return False
         return True
     
-
-class DiceSet:
-    def __init__(self, dice_sets):
-        self.dice_sets = {i: dice for i, dice in enumerate(dice_sets)}
-        self.dice_count = len(dice_sets)
-        self.faces_count = len(dice_sets[0])
-
-    def get_dice(self, index):
-        return self.dice_sets.get(index, [])
-
+    
 class ProbabilityCalculator:
     @staticmethod
     def calculate_probability(user_dice, computer_dice, trials=10000):
@@ -122,7 +113,7 @@ class ProbabilityCalculator:
         computer_probability = (computer_wins / total_games) * 100
         
         return user_probability, computer_probability
-
+    
 class ProbabilityTable:
     def __init__(self, calculator):
         self.calculator = calculator
@@ -147,9 +138,19 @@ class HelpHandler:
         print(self.message_handler.get_message("probability_help"))
         print(self.table.generate(dice_sets))
 
+
+class DiceSet:
+    def __init__(self, dice_sets):
+        self.dice_sets = {i: dice for i, dice in enumerate(dice_sets)}
+        self.dice_count = len(dice_sets)
+        self.faces_count = len(dice_sets[0])
+
+    def get_dice(self, index):
+        return self.dice_sets.get(index, [])
+    
 class PlayerTurn:
-    def __init__(self, dice_set, message_handler, help_handler, hmac_key, player_type):
-        self.dice_set = dice_set
+    def __init__(self, dice_manager, message_handler, help_handler, hmac_key, player_type):
+        self.dice_manager = dice_manager
         self.message_handler = message_handler
         self.help_handler = help_handler
         self.random_generator = RandomGenerator()
@@ -159,55 +160,46 @@ class PlayerTurn:
     def choose_dice(self, available_dice):
         if self.player_type == "user":
             print(f"{Fore.GREEN}Choose your dice...{Style.RESET_ALL}")
-
-            for i, (dice) in enumerate(available_dice.items()):
+            for i, dice in enumerate(available_dice.values()):
                 print(f"🎲 ({i+1}): {str(dice)}")
-            print("(W): Winning probabilities")
-            print("(X): Exit")    
+            print("(W): Winning probability table\n(X): Exit")
 
             while True:
-                choice = input(f"{Fore.MAGENTA}Which dice will you play? (1-{len(available_dice)}, W, X): {Style.RESET_ALL}").strip().lower()
+                choice = input(f"{Fore.MAGENTA}Select dice (1-{len(available_dice)}, W, X): {Style.RESET_ALL}").strip().lower()
 
-                if choice == 'x':
-                    print("Exiting the game...")
-                    sys.exit()
-                elif choice == 'w':
-                    self.help_handler.show_probabilities(self.dice_set.dice_sets)
-                elif choice.isdigit(): 
-                    choice_num = int(choice)
-                    if 1 <= choice_num <= len(available_dice):
-                        
-                        return available_dice[choice_num - 1]
-                    else:
-                        print(f"Please select a number between 1 and {len(available_dice)}.")
-                else:
-                    print("Invalid input, please try again.")
-        else:
-            for i, (dice) in enumerate(available_dice.items()):
-                print(f"🎲 ({i+1}): {', '.join(map(str, dice))}")
-            choice = secrets.randbelow(len(available_dice))  
-            print(f"{Fore.YELLOW}I am choosing dice...({choice + 1}){Style.RESET_ALL}")
-            return available_dice[choice]
+                if choice == 'x': 
+                    sys.exit("Exiting the game...")
+                if choice == 'w': 
+                    self.help_handler.show_probabilities(self.dice_manager.dice_sets)
+                    continue
+                if choice.isdigit() and 1 <= int(choice) <= len(available_dice):
+                    chosen_dice = available_dice[list(available_dice.keys())[int(choice) - 1]]
+                    print(f"Chosen dice: {chosen_dice}") 
+                    return chosen_dice
+
+                print(f"{Fore.RED}Invalid input, please try again.{Style.RESET_ALL}")
+
+        print(f"{Fore.YELLOW}I am choosing dice...{Style.RESET_ALL}")
+        chosen_dice = secrets.choice(list(available_dice.values()))
+        print(f"Chosen dice: {chosen_dice}") 
+        return chosen_dice
+
 
     def roll_and_calculate_mod6(self, available_dice):
-        dice_result = self.choose_dice(available_dice)
-        face_obtained = random.choice(dice_result) 
+        chosen_dice = self.choose_dice(available_dice)
+        face_obtained = random.choice((chosen_dice)) 
 
         random_value = self.random_generator.generate_random(6)
         mod6_value = random_value % 6
         hmac_value = self.random_generator.generate_hmac(self.hmac_key, random_value)
 
         if self.player_type == "user":
-            print(f"{Fore.MAGENTA}You are rolling dice: {dice_result}...{Style.RESET_ALL}")
             print(f"We obtain a number mod 6 between 0-5 for you: {mod6_value} (HMAC: {hmac_value})")
-
             result = [face_obtained + mod6_value]
             print(f"{Fore.YELLOW}Your dice: {face_obtained} Your mod6: {mod6_value}{Style.RESET_ALL}")
             print(f"{Fore.BLUE}This is your result: {result}{Style.RESET_ALL}")
         else:
-            print(f"{Fore.MAGENTA}Dice: {dice_result}...{Style.RESET_ALL}")
             print(f"We obtain a number mod 6 between 0-5 for me: {mod6_value} (HMAC={hmac_value})")
-            
             result = [face_obtained + mod6_value]
             print(f"{Fore.YELLOW}My dice: {face_obtained} My Mod6: {mod6_value}{Style.RESET_ALL}")
             print(f"{Fore.BLUE}This is my result: {result}{Style.RESET_ALL}")
@@ -219,20 +211,20 @@ class DiceGame:
         self.message_handler = MessageHandler()
         self.random_generator = RandomGenerator()
         self.hmac_key = self.random_generator.generate_hmac_key()
-        self.dice_set = DiceSet(dice_sets)
+        self.dice_manager = DiceSet(dice_sets)
         self.probability_calculator = ProbabilityCalculator()
         self.probability_table = ProbabilityTable(self.probability_calculator)
         self.help_handler = HelpHandler(self.probability_table, self.message_handler)
-        self.user_turn = PlayerTurn(self.dice_set, self.message_handler, self.help_handler, self.hmac_key, "user")
-        self.computer_turn = PlayerTurn(self.dice_set, self.message_handler, self.help_handler, self.hmac_key, "computer")
+        self.user_turn = PlayerTurn(self.dice_manager, self.message_handler, self.help_handler, self.hmac_key, "user")
+        self.computer_turn = PlayerTurn(self.dice_manager, self.message_handler, self.help_handler, self.hmac_key, "computer")
         self.result_handler = Result(self.message_handler)
         self.total_rounds = 3
         self.total_choices = 4
 
     def start(self):
-        available_dice = self.dice_set.dice_sets.copy()
-        dice_count = self.dice_set.dice_count
-        faces_count = self.dice_set.faces_count
+        available_dice = self.dice_manager.dice_sets.copy()
+        dice_count = self.dice_manager.dice_count
+        faces_count = self.dice_manager.faces_count
         self.show_welcome(dice_count, faces_count)
         self.play_turn(available_dice)
 
@@ -263,7 +255,7 @@ class DiceGame:
             else:
                 print("Invalid input, try again.")
 
-
+    
     def play_turn(self, available_dice):
         for round_number in range(self.total_rounds):
             print(f"\n{Fore.YELLOW}--- Round {round_number + 1} ---{Style.RESET_ALL}")
@@ -287,7 +279,7 @@ class DiceGame:
         if replay == 'y':
             self.user_wins = 0
             self.computer_wins = 0
-            available_dice = self.dice_set.dice_sets
+            available_dice = self.dice_manager.dice_sets
             self.play_turn(available_dice)
         else:
             print("Thanks for playing! 👋")

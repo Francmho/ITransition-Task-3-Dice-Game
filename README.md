@@ -5,6 +5,9 @@ A console script that implements a generalized dice game.
 
 Welcome to the General Non-Transitive Dice Game! In this game, players select dice with different faces and compete against the computer. The unique feature of this game is the non-transitive nature of the dice – one die may beat another, but lose to a third. This makes the game both fair and strategic.
 
+[Demo Video](./game_dice.py)
+
+
 ## Features
 
 - 🎲 Dice Throws: Both player and computer take turns rolling the dice.
